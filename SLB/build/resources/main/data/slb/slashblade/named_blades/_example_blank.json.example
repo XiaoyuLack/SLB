@@ -1,0 +1,15 @@
+{
+  "name": "slb:example_blank",
+  "properties": {
+    "attack_base": 8.0,
+    "max_damage": 100,
+    "slash_art": "slashblade:drive_vertical",
+    "sword_type": ["bewitched"],
+    "special_effects": ["slb:swift_edge", "slb:glow_edge"]
+  },
+  "render": {
+    "model": "slb:model/example_blank/model.obj",
+    "texture": "slb:model/example_blank/texture.png",
+    "carry_type": "katana"
+  }
+}

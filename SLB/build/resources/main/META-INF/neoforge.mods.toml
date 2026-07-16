@@ -1,0 +1,43 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "slb"
+version="1.0.0"
+displayName="SLB SlashBlade Addon"
+logoFile="logo.png"
+authors="SLB"
+description='''
+SLB — 数据驱动的 SlashBlade Resharped 附属模组
+
+核心设计：每把命名刀 = 1个JSON + 1个OBJ + 1个PNG
+无需修改 Java 代码即可添加新刀。
+
+功能特色：
+- JSON 数据驱动：所有刀的参数（攻击力、附魔、剑类型等）在 JSON 中定义
+- 模型即插即用：OBJ+PNG 模型文件放入对应目录即可
+- 支持数据包/资源包/KubeJS 外部自定义
+- 全局配置：通过 config/slb.json5 控制全局参数
+'''
+
+[[dependencies.slb]]
+    modId="neoforge"
+    mandatory=true
+    versionRange="[21,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.slb]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.21.1,1.21.2)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.slb]]
+    modId="slashblade"
+    mandatory=true
+    versionRange="[2.0.3,)"
+    ordering="NONE"
+    side="BOTH"

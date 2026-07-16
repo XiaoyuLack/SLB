@@ -1,0 +1,6 @@
+{
+  "item.slb.example_blank": "示例刀「空白」",
+  "item.slb.example_blank.desc": "§7这是 SLB 的示例刀，替换为你的模型即可使用",
+
+  "itemGroup.slb": "SLB 拔刀剑"
+}

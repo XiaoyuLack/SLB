@@ -1,0 +1,35 @@
+{
+  "_comment": "SLB 自定义 Special Effect 定义文件",
+  "ses": {
+    "_example": {
+      "_comment": "示例 SE——手持加速+概率二连击，等级不足时获得缓慢",
+      "requestLevel": 8,
+      "isCopiable": true,
+      "isRemovable": true,
+      "effects": [
+        {
+          "type": "potion",
+          "id": "minecraft:speed",
+          "amplifier": 0,
+          "duration": 200,
+          "trigger": "held"
+        },
+        {
+          "type": "double_strike",
+          "chance": 0.15,
+          "ratio": 0.6,
+          "trigger": "hit"
+        }
+      ],
+      "penalty": [
+        {
+          "type": "potion",
+          "id": "minecraft:slowness",
+          "amplifier": 0,
+          "duration": 100,
+          "trigger": "held"
+        }
+      ]
+    }
+  }
+}
