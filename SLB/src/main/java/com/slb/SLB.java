@@ -2,6 +2,8 @@ package com.slb;
 
 import com.mojang.logging.LogUtils;
 import com.slb.config.SLBConfig;
+import com.slb.registry.SLBClientHandler;
+import com.slb.registry.SLBItems;
 import com.slb.registry.SLBSpecialEffectsRegistry;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -10,6 +12,13 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
 import org.slf4j.Logger;
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.loading.FMLEnvironment;
+
+import java.nio.file.Path;
 
 /**
  * SLB — SlashBlade Resharped Addon
@@ -40,10 +49,45 @@ public class SLB {
         // 注册 NeoForge 配置文件
         modContainer.registerConfig(ModConfig.Type.COMMON, SLBConfig.SPEC, "slb.json5");
 
+        // 从 ModContainer 获取 Mod JAR 路径
+        Path jarPath = null;
+        try {
+            var owningFile = modContainer.getModInfo().getOwningFile();
+            if (owningFile != null) {
+                jarPath = owningFile.getFile().getFilePath();
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Could not get mod jar path from ModContainer: {}", e.getMessage());
+        }
+
+        // 注册命名刀独立物品（slb:<刀名>）— 自动从 named_blades 目录发现
+        SLBItems.init(jarPath);
+        SLBItems.register(modEventBus);
+
         // 注册自定义 Special Effect（数据驱动，从 slb_ses.json 加载）
         modEventBus.addListener(SLBSpecialEffectsRegistry::onRegister);
 
+        // 注册完成后打印所有命名刀的注册键和类名，用于调试
+        modEventBus.addListener((RegisterEvent event) -> {
+            if (event.getRegistryKey() == Registries.ITEM) {
+                SLBItems.getNamedBlades().forEach(item -> {
+                    ResourceLocation key = BuiltInRegistries.ITEM.getKey(item);
+                    SLB.LOGGER.info("=== SLB Blade Registry Check ===");
+                    SLB.LOGGER.info("  Blade ID : {}", item.getBladeDefinitionId());
+                    SLB.LOGGER.info("  Registry  : {}", key);
+                    SLB.LOGGER.info("  Item class: {}", item.getClass().getName());
+                    SLB.LOGGER.info("  Is Named  : {}",
+                            item instanceof com.slb.item.NamedBladeItem);
+                });
+            }
+        });
+
         modEventBus.addListener(this::commonSetup);
+
+        // 注册客户端模型处理器（仅在客户端环境下注册，避免引用 BladeModel 类）
+        if (FMLEnvironment.dist.isClient()) {
+            SLBClientHandler.register(modEventBus);
+        }
 
         LOGGER.info("SLB loaded! Ready for data-driven blades with custom SEs.");
     }

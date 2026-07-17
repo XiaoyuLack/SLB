@@ -31,15 +31,18 @@ SLB 是 **NextCombat 整合包**的拔刀剑附属模组（NeoForge 1.21.1），
 
 ## 添加新刀（无需改 Java）
 
-只需添加资源文件后重新打包：
+只需添加资源文件后重新构建：
 
 ```bash
 1. 把 model.obj + texture.png 放入 assets/slb/model/<刀名>/
 2. 创建 data/slb/slashblade/named_blades/<刀名>.json
-3. 在 lang 文件中添加名称和描述（zh_cn.json / en_us.json）
-4. ./gradlew build
-5. 用 build/libs/SLB.jar 替换 mods/ 下的旧文件
+3. 创建 assets/slb/models/item/<刀名>.json（物品模型，引用 slb_blade.json）
+4. 在 lang 文件中添加名称和描述（zh_cn.json / en_us.json）
+5. ./gradlew build
+6. 用 build/libs/SLB.jar 替换 mods/ 下的旧文件
 ```
+
+> **第 3 步说明：** 每个 SLB 刀需要独立的物品模型 JSON，内容固定为 `{"parent": "slb:item/slb_blade"}`。模板文件 `slb_blade.json` 已内置在 `assets/slb/models/item/` 中，引用 `builtin/entity` 父模型来触发 SlashBlade 的自定义 OBJ 渲染器。没有这个文件，刀在 JEI 和物品栏中会显示为透明。**SLBItems 在构建时不会自动生成这个文件**，需要手动创建。
 
 > 已有 **53 把崩坏 3** 模型文件可直接使用，见 `assets/slb/model/`（需自行编写 JSON 定义）。
 > 参考模板 `_example_blank.json.example` 位于 `named_blades/` 目录下（`.example` 后缀不会被 SlashBlade 加载，避免因缺少模型文件而崩溃）。
@@ -199,11 +202,45 @@ SE 描述文字通过语言文件定义，格式为 `se.slb.<se_name>`。
 
 ---
 
+## 物品注册流程
+
+SLB 的命名刀物品注册采用 **自动发现 + DeferredRegister** 模式，与 SE 系统的数据流类似：
+
+```
+named_blades/<刀>.json → SLBItems.init() / scanJarFile()
+  → 解析 JSON 提取 render.model + render.texture
+  → 创建 NamedBladeItem（配合默认 BladeStateData 组件）
+  → DeferredRegister<Item> 注册为 slb:<刀名>
+
+PlayerTickEvent → SLBItemHandler
+  → 检测未初始化的 NamedBladeItem 栈
+  → 从 SlashBladeDefinition Registry 读取完整定义
+  → 写入 BladeStateData 组件（translationKey 等）
+  → 刀恢复正常成长/显示
+
+客户端 → SLBClientHandler
+  → onRegisterClientExtensions → 为每个 NamedBladeItem 绑定 SlashBladeTEISR
+  → onModelBake → 用 BladeModel 包装物品模型（触发 isCustomRenderer=true）
+  → 最终调用 BladeRenderState.renderOverrided → WavefrontObject 渲染 OBJ
+```
+
+**关键设计要点：**
+
+| 组件 | 职责 |
+|------|------|
+| `SLBItems` | 扫描 JAR/classpath 下 `named_blades/` JSON，自动注册为独立物品 |
+| `NamedBladeItem` | 继承 `ItemSlashBlade`，覆写 `getDescriptionId`/`getName`/`getCreatorModId`/`getBladeId`，始终返回 `slb:` 命名空间 |
+| `SLBItemHandler` | PlayerTickEvent 自动配置 /give 获得的空白刀（解决空白刀问题） |
+| `SLBClientHandler` | 客户端模型绑定 — 注册 TEISR + BladeModel，确保 JEI 和物品栏正确渲染 OBJ |
+| 物品模型 JSON | `assets/slb/models/item/<刀名>.json` → `slb_blade.json` → `builtin/entity`，每把刀必需，否则渲染透明 |
+
+---
+
 ## 项目结构
 
 ```
 SLB/
-├── build.gradle                          ← NeoGradle 7.1.38
+├── build.gradle                          ← NeoGradle
 ├── settings.gradle                       ← 项目名 + 插件仓库
 ├── gradle.properties                     ← 版本号常量
 ├── gradlew / gradlew.bat                ← Gradle wrapper
@@ -211,24 +248,31 @@ SLB/
 └── src/main/
     ├── java/com/slb/
     │   ├── SLB.java                      ← @Mod 主类
-    │   ├── config/SLBConfig.java         ← config/slb.json5
+    │   ├── config/SLBConfig.java          ← config/slb.json5
+    │   ├── item/
+    │   │   └── NamedBladeItem.java        ← 命名刀独立物品（继承 ItemSlashBlade）
     │   ├── kubejs/
-    │   │   └── SLBKubeJSHelper.java      ← KubeJS 桥接层（SE检测 + 刀属性读取）
+    │   │   └── SLBKubeJSHelper.java       ← KubeJS 桥接层（SE检测 + 刀属性读取）
     │   ├── registry/
+    │   │   ├── SLBItems.java              ← 自动发现 named_blades JSON + DeferredRegister 注册
+    │   │   ├── SLBItemHandler.java        ← PlayerTickEvent 自动初始化空白刀 BladeStateData
+    │   │   ├── SLBClientHandler.java      ← 客户端：注册 BladeModel 包装器 + SlashBladeTEISR
     │   │   ├── SLBSpecialEffectsRegistry.java  ← SE 数据加载 + 动态注册
-    │   │   └── SLBSEEventHandler.java         ← SE 事件统一分发
+    │   │   └── SLBSEEventHandler.java          ← SE 事件统一分发
     │   └── specialeffect/
     │       ├── CompositeSE.java           ← 通用 SE 类（效果组件容器）
-    │       └── EffectHandlers.java        ← 原子效果类型实现
+    │       └── EffectHandlers.java        ← 15 种原子效果类型实现
     └── resources/
         ├── slb_ses.json                  ← SE 定义（用户可编辑）
         ├── META-INF/neoforge.mods.toml
         ├── pack.mcmeta
         ├── assets/slb/
         │   ├── lang/{zh_cn,en_us}.json   ← 语言文件
-        │   └── model/                    ← OBJ + PNG 模型
+        │   ├── models/item/
+        │   │   └── slb_blade.json         ← 物品模型模板（builtin/entity → SlashBladeTEISR）
+        │   └── model/                     ← OBJ + PNG 模型
         └── data/slb/slashblade/named_blades/
-            ├── _example_blank.json.example  ← 参考模板
+            ├── _example_blank.json.example  ← 参考模板（.example 不会被加载）
             └── HOW_TO_ADD_A_BLADE.md       ← 使用说明
 ```
 
@@ -240,8 +284,9 @@ SLB/
 
 - `@Mod("slb")` — NeoForge 入口
 - 构造阶段注册 `SLBConfig`（`ModConfig.Type.COMMON` → `config/slb.json5`）
+- 调用 `SLBItems.init(jarPath)` + `SLBItems.register(modEventBus)` — 自动扫描 `named_blades/` JSON，为每把刀注册独立的 `NamedBladeItem`（`slb:<刀名>`）到 DeferredRegister
 - 注册 `SLBSpecialEffectsRegistry::onRegister` 监听 RegisterEvent，从 `slb_ses.json` 动态注册自定义 SE
-- 所有命名刀由 SlashBlade Resharped 通过 datapack 自动发现，无需 Java 注册
+- 客户端环境下注册 `SLBClientHandler`，为 NamedBladeItem 绑定 SlashBladeTEISR + BladeModel（OBJ 渲染支持）
 
 ### SLBConfig.java
 
