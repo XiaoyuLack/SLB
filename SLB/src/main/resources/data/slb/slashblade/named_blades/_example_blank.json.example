@@ -1,4 +1,5 @@
 {
+  "item": "slb:example_blank"
   "name": "slb:example_blank",
   "properties": {
     "attack_base": 8.0,
